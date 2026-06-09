@@ -1,115 +1,107 @@
 # Real-Time Stock Market Data Pipeline
 
-An enterprise-grade, distributed data engineering platform designed to ingest, process, transform, and serve real-time financial market data.
+An enterprise-grade, distributed real-time data pipeline designed for processing streaming stock market datasets. Built using a robust microservices architecture, this platform leverages Apache Kafka, Apache Spark, and Apache Airflow to ingest, process, transform, and analyze live financial market data at scale.
+
+By utilizing automated ETL workflows, scalable orchestration, and optimized PostgreSQL storage (via dbt materializations), this platform drastically improves analytics processing efficiency, making it production-ready for financial institutions.
 
 ## System Architecture
 
-The platform implements an event-driven, scalable microservices architecture utilizing best-in-class data engineering tools.
+The pipeline consists of deeply integrated, decoupled services running in a scalable containerized environment:
 
 ```mermaid
-graph TD
-    %% Ingestion Layer
-    A[Kafka Producer (Simulated Live Market Feed)] -->|Streaming Ticks| B(Apache Kafka Brokers)
+flowchart TD
     
-    %% Processing Layer
-    B -->|Subscribe: stock_ticks| C(Apache Spark Streaming)
-    C -->|Aggregate Moving Averages & Volatility| C
-    
-    %% Storage & Caching Layer
-    C -->|JDBC Write| D[(PostgreSQL Data Warehouse)]
-    
-    %% Orchestration Layer
-    E[Apache Airflow] -->|Trigger Data Validations| D
-    E -->|Trigger Transformations| F(dbt Models)
-    F -->|Materialize Analytics Views| D
-    
-    %% API & Serving Layer
-    D -->|Query Data| G[FastAPI Backend Service]
-    H[Redis Cache] <-->|Speed up frequent queries| G
-    
-    %% Presentation Layer
-    G -->|REST APIs (JWT Auth)| I[Client Dashboards / Analysts]
-    
-    %% Observability Layer
-    J[Prometheus] -->|Scrape Metrics| G
-    J -->|Scrape Metrics| B
-    K[Grafana] -->|Visualize Metrics| J
+    subgraph Data Ingestion
+        Producer[Kafka Producer\nSimulated Stock Ticks]
+        Broker[Kafka Cluster & Zookeeper\nTopic: stock_ticks]
+        Producer -->|Publish| Broker
+    end
+
+    subgraph Real-Time Stream Processing
+        Spark[Apache Spark Streaming\nMoving Averages & Volatility]
+        Broker -->|Subscribe| Spark
+    end
+
+    subgraph Storage & Caching
+        Spark -->|Write| DB[(PostgreSQL\nWarehouse)]
+        FastAPI -->|Cache| Redis[(Redis)]
+    end
+
+    subgraph ETL & Orchestration
+        Airflow[Apache Airflow\nData Quality DAGs]
+        dbt[dbt Models\nOptimized Analytics]
+        Airflow -->|Schedule & Trigger| dbt
+        dbt -->|Transform & Materialize| DB
+    end
+
+    subgraph API Gateway
+        FastAPI[FastAPI Backend\nREST APIs & JWT Auth]
+        DB -->|Read| FastAPI
+        Client[Analysts / Dashboards] <-->|HTTP Requests| FastAPI
+    end
+
+    subgraph Observability
+        Prometheus[Prometheus\nMetrics Scraper]
+        Grafana[Grafana\nDashboards]
+        Prometheus -.-> Broker
+        Prometheus -.-> FastAPI
+        Grafana -->|Visualize| Prometheus
+    end
+
 ```
 
-### 1. Event Streaming (Apache Kafka)
-Kafka acts as the central nervous system of the architecture. It receives high-throughput stock market tick data produced asynchronously.
-- **Fault Tolerance**: Data is buffered and partitioned, allowing replayability and preventing data loss during traffic spikes.
-- **Decoupling**: The streaming layer decouples the ingestion pipeline from the processing backend.
+## Tech Stack
 
-### 2. Distributed Processing (Apache Spark)
-Spark Structured Streaming is configured to consume directly from the Kafka `stock_ticks` topics.
-- **Tumbling Windows**: Spark computes critical real-time financial metrics, including 1-minute tumbling windows for moving averages and standard deviation (volatility).
-- **Scalability**: Capable of horizontally scaling through a Master/Worker cluster deployment.
+*   **Backend Framework**: Python 3.11, FastAPI, Pydantic, SQLAlchemy
+*   **Message Broker**: Apache Kafka, Zookeeper
+*   **Stream Processing**: PySpark (Apache Spark Structured Streaming)
+*   **Orchestration & ETL**: Apache Airflow, dbt (Data Build Tool)
+*   **Databases**: PostgreSQL (Primary Storage), Redis (Caching)
+*   **Infrastructure**: Docker, Docker Compose
+*   **Observability**: Prometheus, Grafana
+*   **CI/CD**: GitHub Actions
 
-### 3. Workflow Orchestration (Apache Airflow & dbt)
-To drastically improve analytics processing efficiency, an automated ETL workflow runs hourly:
-- **Airflow**: Orchestrates data quality validations on the live tables to ensure anomaly-free datasets.
-- **dbt**: Transforms and pre-aggregates the raw analytical metrics into highly optimized reporting views within PostgreSQL, **improving query processing efficiency by 55%**.
+## Key Features
 
-### 4. API Gateway & Backend (FastAPI)
-The backend service exposes the real-time analytics to downstream clients via high-performance REST APIs.
-- **Clean Architecture**: Follows Domain-Driven Design (DDD) principles with separated repositories, SQLAlchemy schemas, and dependency-injected database sessions.
-- **Security**: Fully secured using JWT (JSON Web Tokens) with hashed password authentication workflows.
+*   **Live Event Streaming**: Highly scalable tick ingestion using Kafka topics and partitioned consumer groups.
+*   **Distributed Analytics**: Rolling window aggregations computing standard deviation (volatility) and moving averages via Spark.
+*   **Automated Validation**: Airflow DAGs automatically scan streaming output for data quality anomalies.
+*   **Efficiency Optimized Storage**: Heavily aggregated metric tables are materialized into Postgres via scheduled dbt jobs, yielding massive analytical query performance boosts.
+*   **Secure API Access**: Fully protected JWT-based REST architecture.
 
-### 5. Observability (Prometheus & Grafana)
-The health of the distributed pipeline is monitored in real-time.
-- **Metrics**: Kafka throughput, pipeline latency, API response times, and system health are scraped by Prometheus and visualized in Grafana dashboards.
-
----
-
-## Deployment Instructions
+## Getting Started
 
 ### Prerequisites
-- Docker
-- Docker Compose
+* Docker and Docker Compose installed.
 
-### Local Environment Setup
+### Local Deployment
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository_url>
-   cd real-time-stock-market-data-pipeline
-   ```
-
-2. **Configure Environment Variables**:
-   Copy the example file to initialize the environment:
+1. Clone the repository and navigate to the root directory.
+2. Setup your environment file:
    ```bash
    cp .env.example .env
    ```
-
-3. **Start the Distributed Services**:
-   This spins up the API, PostgreSQL, Redis, Zookeeper, Kafka, Spark, Airflow, Prometheus, and Grafana.
+3. Boot up the entire architecture (this will pull and build Kafka, Spark, Postgres, Airflow, and the FastAPI application):
    ```bash
-   docker-compose up --build -d
+   docker-compose up -d --build
+   ```
+4. Verify all containers are running successfully:
+   ```bash
+   docker ps
    ```
 
-4. **Initialize Database Migrations**:
-   Run Alembic to create the database schemas.
-   ```bash
-   docker-compose exec backend alembic upgrade head
-   ```
+### Accessing the Services
 
-### Accessing the Platform
+*   **FastAPI Swagger UI**: `http://localhost:8000/docs`
+*   **Airflow Webserver**: `http://localhost:8081` (Default login: `admin` / `admin`)
+*   **Spark Master UI**: `http://localhost:8080`
+*   **Grafana Dashboards**: `http://localhost:3000` (Default login: `admin` / `admin`)
 
-- **FastAPI Interactive Docs (Swagger)**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **Airflow Web UI**: [http://localhost:8080](http://localhost:8080) (Credentials: admin/admin)
-- **Grafana Dashboards**: [http://localhost:3000](http://localhost:3000)
-- **Spark Master UI**: [http://localhost:8081](http://localhost:8081)
+## Running Automated Tests
+The repository enforces code quality and structural integrity using a comprehensive `pytest` suite simulating isolated database instances and mocking FastAPI dependencies.
 
----
-
-## Automated Testing
-
-The platform enforces 100% automated test coverage of the API and ETL triggers via a dedicated GitHub Actions CI/CD pipeline.
-
-To run tests locally:
+Run the tests inside the backend container:
 ```bash
 docker-compose exec backend pytest
 ```
-
-Tests use an isolated, in-memory SQLite dependency injection to prevent mutating production PostgreSQL stores.
+*Note: This is automatically executed in the GitHub Actions CI pipeline on every push and pull request.*
