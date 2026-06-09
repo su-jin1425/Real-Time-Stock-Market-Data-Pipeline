@@ -1,0 +1,12 @@
+stock_pipeline:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      threads: 4
+      host: db
+      port: 5432
+      user: postgres
+      pass: password
+      dbname: stock_market_db
+      schema: public
